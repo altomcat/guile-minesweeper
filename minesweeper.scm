@@ -83,25 +83,43 @@
 		(newline))
 	      (iota rows))))
 
-(define (index->position minefield id)
-  (let* ((dimensions (array-dimensions minefield))
-	 (cols (cadr dimensions))
-	 (j  (euclidean-quotient id cols))
-	 (i (modulo id cols)))
-    (list i j)))
+(define (set-traveled-field minefield-state id)  
+  (let* ((cols (minefield-state-cols minefield-state))
+	 (board (minefield-state-board minefield-state))
+	 (traveled-board (minefield-state-traveled-board minefield-state))
+	 (pos (index->position cols id))
+	 (row (car pos))
+	 (col (cadr pos)))
+    (array-set! traveled-board #t row col)
+    (when (= (array-ref board row col) -1)
+      (set-minefield-state-loose! minefield-state #t))))
 
-(define (index->position2 cols id)
-  (let ((j  (euclidean-quotient id cols))
-	(i (modulo id cols)))
-    (list i j)))
+(define (index->position cols id)
+  (let ((row (euclidean-quotient id cols))
+	(col (modulo id cols)))
+    (list row col)))
 
 ;; Unit tests
 ;;
-(define m (minefield-state-board (minefield-create 4 5)))
+(define board-state (minefield-create 4 5))
+(define m (minefield-state-board board-state))
+(define t (minefield-state-traveled-board board-state))
+(define cols (minefield-state-cols board-state))
+
+(set-traveled-field board-state 0)
+(set-traveled-field board-state 10)
+(set-traveled-field board-state 19)
+
 (test-begin "tests")
-(test-assert (equal? (index->position m 0) '(0 0)))
-(test-assert (equal? (index->position m 12) '(2 2)))
-(test-assert (equal? (index->position m 19) '(4 3)))
+
+(test-assert (equal? (index->position cols 0) '(0 0)))
+(test-assert (equal? (index->position cols 10) '(2 0)))
+(test-assert (equal? (index->position cols 19) '(3 4)))
+
+(test-assert (equal? (array-ref t 0 0) #t))
+(test-assert (equal? (array-ref t 2 0) #t))
+(test-assert (equal? (array-ref t 3 4) #t))
+
 (test-end "tests")
 
 ;; (newline)
