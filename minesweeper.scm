@@ -12,15 +12,20 @@
 	    minefield-state-board
 	    minefield-state-traveled-board
 	    minefield-state?
+            minefield-state-win?
+	    minefield-state-loose?
+	    set-traveled-field
 	    ))
 
 (define-record-type <minefield-state>
-  (make-minefield-state rows cols board traveled-board)
+  (make-minefield-state rows cols board traveled-board win? loose?)
   minefield-state?
   (rows minefield-state-rows)
   (cols minefield-state-cols)
   (board minefield-state-board)
-  (traveled-board minefield-state-traveled-board))
+  (traveled-board minefield-state-traveled-board)
+  (win? minefield-state-win? set-minefield-state-win!)
+  (loose? minefield-state-loose? set-minefield-state-loose!))
 
 (define (minefield-create rows cols)  
   (define minefield (make-typed-array 's8 0 rows cols))
@@ -29,7 +34,7 @@
   (array-set! minefield -1 1 2)
   (array-set! minefield -1 2 2)
 
-  (define traveled-field (make-array 0 rows cols))
+  (define traveled-field (make-array #f rows cols))
   
   (define (calc-vicinity minefield i j)
     (let ((cur (array-ref minefield i j))
@@ -54,7 +59,7 @@
 	    (iota rows))
   ;; show the board in the console
   (minefield-show minefield)
-  (make-minefield-state rows cols minefield traveled-field))
+  (make-minefield-state rows cols minefield traveled-field #f #f))
 
 (define (mine? minefield i j)
   (equal? -1 (and (array-in-bounds? minefield i j)
