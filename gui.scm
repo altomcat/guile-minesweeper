@@ -38,7 +38,7 @@
   (width-screen minesweeper-game-width)
   (height-screen minesweeper-game-height)
   (assets minesweeper-game-assets)
-  (sprite-recs minesweeper-game-spriter-recs))
+  (sprite-recs minesweeper-game-sprite-recs))
 
 (define (init-game rows cols)  
   (define SCREEN-WIDTH (+ (* 2 10) (* 64 cols)))
@@ -87,16 +87,19 @@
 
 ;; main Raylib loop
 (define (main-game minesweeper-game minefield-state)
-  (let loop () 
-    (unless (WindowShouldClose)
-      (manage-key-event (minesweeper-game-assets minesweeper-game)
-			(minesweeper-game-spriter-recs minesweeper-game))
+  (let loop ((exitWindow #f)) 
+    (unless exitWindow
+      (manage-key-event minesweeper-game minefield-state)
       (BeginDrawing)
       (ClearBackground RAYWHITE)
-      (DrawText "Minesweeper in progress ..." 10 300 20 LIGHTGRAY)
+      (if (minefield-state-loose? minefield-state)
+	  (DrawText "You loose !!!" 10 300 20 LIGHTGRAY)
+	  (DrawText "Playing Minesweeper ..." 10 300 20 LIGHTGRAY))
       (draw-board minesweeper-game minefield-state)
       (EndDrawing)
-      (loop))))
+      (loop (or (minefield-state-win? minefield-state)
+		(WindowShouldClose))))))
+
 
 (define (draw-board minesweeper-game minefield-state)
   (let* ((all-sprites (all-sprites-from
@@ -106,19 +109,18 @@
 	 (traveled-board (minefield-state-traveled-board minefield-state))
          (rows (minefield-state-rows minefield-state))
 	 (cols (minefield-state-cols minefield-state)))
+    
     (for-each (lambda (i)
 		(for-each (lambda (j)
-			    (let ((sprite-id
-				   (if (= 0 (array-ref traveled-board i j))
-				       HIDDEN-CELL
-				       (match (array-ref board-state i j)
-					 ((< 0) MINE-CELL)
-					 ((= 0) EMPTY-CELL)
-					 (_ HIDDEN-CELL)))))
+			    (let* ((state (array-ref board-state i j))
+				   (id
+				    (cond
+				     ((not (array-ref traveled-board i j)) HIDDEN-CELL)
+				     ((= state -1) MINE-CELL)
+				     (else state))))
 			      (DrawTextureRec
 			       sprite-texture
-			       (list-ref (cadr all-sprites)
-					 sprite-id)
+			       (list-ref (cadr all-sprites) id)
 			       (make-Vector2 (+ (* j 64) START-X)
 					     (+ (* i 64) START-Y))
 			       WHITE)))
@@ -126,20 +128,25 @@
 	      (iota rows))))
 
 
-(define (manage-key-event my-assets recs)
-  (cond
-   ((IsMouseButtonPressed MOUSE_BUTTON_LEFT)
-    (let ((mousePoint (GetMousePosition)))
-      (for-each (lambda (i)
-		  (when (CheckCollisionPointRec mousePoint
-						(vector-ref recs i))
-		    (format #t "hit cell [~a]~%" i)
-		    ;;(vector-set! traveled-field i #t)
-		    ;; (PlaySound (sonar-snd-from  my-assets))
-		    ))
-		(iota (* 5 4)))))
-   ((IsKeyPressed KEY_ENTER)
-    (PlaySound (congrats-snd-from my-assets)))))
+(define (manage-key-event minesweeper-game minefield-state)
+  (let ((assets (minesweeper-game-assets minesweeper-game))
+	(game (minesweeper-game-sprite-recs minesweeper-game))
+	(recs (minesweeper-game-sprite-recs minesweeper-game))
+	(game-over? (minefield-state-loose? minefield-state)))
+    (cond
+     (game-over?)
+     ((IsMouseButtonPressed MOUSE_BUTTON_LEFT)
+      (let ((mousePoint (GetMousePosition)))
+	(for-each (lambda (id)
+		    (when (CheckCollisionPointRec mousePoint
+						  (vector-ref recs id))
+		      (format #t "hit cell [~a]~%" id)
+		      (set-traveled-field minefield-state id)
+		      ;; (PlaySound (sonar-snd-from  my-assets))
+		      ))
+		  (iota (* 5 4)))))
+     ((IsKeyPressed KEY_ENTER)
+      (PlaySound (congrats-snd-from my-assets))))))
 
 (define (end-game minesweeper-game)
   (let ((assets (minesweeper-game-assets minesweeper-game)))
