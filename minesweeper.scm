@@ -69,8 +69,8 @@
   (and (not (mine? minefield i j))
        (>= (array-ref minefield i j ) 0)))
 
-(define (mine-discover minefield traveled-field i j)
-  (mine? i j))
+;; (define (mine-discover minefield traveled-field i j)
+;;   (mine? i j))
 
 (define (minefield-show minefield)
   (define (toString value)
@@ -96,6 +96,9 @@
 	 (row (car pos))
 	 (col (cadr pos)))
     (array-set! traveled-board #t row col)
+    (when (win-game? minefield-state)
+      (display "YOU WIN!\n")
+      (set-minefield-state-win! minefield-state #t))
     (when (= (array-ref board row col) -1)
       (set-minefield-state-loose! minefield-state #t))))
 
@@ -103,6 +106,44 @@
   (let ((row (euclidean-quotient id cols))
 	(col (modulo id cols)))
     (list row col)))
+
+(define (win-game? minefield-state)
+  (let ((t (traveled-count minefield-state))
+	(m (mine-count minefield-state))
+	(total-cells (* (minefield-state-rows minefield-state)
+			(minefield-state-cols minefield-state))))
+    (equal? (+ m t) total-cells)))
+
+(define (traveled-count minefield-state)
+  (let ((board (minefield-state-traveled-board minefield-state))
+	(rows (minefield-state-rows minefield-state))
+	(cols (minefield-state-cols minefield-state))
+	(count 0))
+    
+    (for-each (lambda (i)
+		(for-each (lambda (j)
+			    (when (equal? (array-ref board i j) #t)
+			      (set! count (1+ count))))
+			  (iota cols)))
+	      (iota rows))
+    count)
+  )
+
+(define (mine-count minefield-state)
+  (let ((board (minefield-state-board minefield-state))
+	(rows (minefield-state-rows minefield-state))
+	(cols (minefield-state-cols minefield-state))
+	(count 0))
+    
+    (for-each (lambda (i)
+		(for-each (lambda (j)
+			    (when (equal? (array-ref board i j) -1)
+			      (set! count (1+ count))))
+			  (iota cols)))
+	      (iota rows))
+    count)
+  )
+
 
 ;; Unit tests
 ;;
@@ -114,7 +155,7 @@
 (set-traveled-field board-state 0)
 (set-traveled-field board-state 10)
 (set-traveled-field board-state 19)
-
+(mine-count board-state)
 (test-begin "tests")
 
 (test-assert (equal? (index->position cols 0) '(0 0)))
@@ -125,6 +166,8 @@
 (test-assert (equal? (array-ref t 2 0) #t))
 (test-assert (equal? (array-ref t 3 4) #t))
 
+(test-assert (equal? (traveled-count board-state) 3))
+(test-assert (equal? (mine-count board-state) 4))
 (test-end "tests")
 
 ;; (newline)

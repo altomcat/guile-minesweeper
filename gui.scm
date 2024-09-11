@@ -90,16 +90,28 @@
   (let loop ((exitWindow #f)) 
     (unless exitWindow
       (manage-key-event minesweeper-game minefield-state)
+
       (BeginDrawing)
       (ClearBackground RAYWHITE)
-      (if (minefield-state-loose? minefield-state)
-	  (DrawText "You loose !!!" 10 300 20 LIGHTGRAY)
-	  (DrawText "Playing Minesweeper ..." 10 300 20 LIGHTGRAY))
-      (draw-board minesweeper-game minefield-state)
-      (EndDrawing)
-      (loop (or (minefield-state-win? minefield-state)
-		(WindowShouldClose))))))
 
+      (if (minefield-state-win? minefield-state)
+	  (let ((congrats-snd (congrats-snd-from
+			       (minesweeper-game-assets minesweeper-game))))
+            (DrawText "YOU WIN!!!" 10 300 20 GREEN)
+	    (unless (IsSoundPlaying congrats-snd)
+	      (PlaySound congrats-snd))))
+      
+      (if (minefield-state-loose? minefield-state)	
+	  (DrawText "YOU LOOSE!!!" 10 300 20 LIGHTGRAY))
+      
+      (draw-board minesweeper-game minefield-state)
+      
+      (unless (or (minefield-state-win? minefield-state)
+		  (minefield-state-loose? minefield-state))
+	(DrawText "Playing Minesweeper ..." 10 300 20 LIGHTGRAY))
+
+      (EndDrawing)
+      (loop (WindowShouldClose)))))
 
 (define (draw-board minesweeper-game minefield-state)
   (let* ((all-sprites (all-sprites-from
@@ -132,7 +144,10 @@
   (let ((assets (minesweeper-game-assets minesweeper-game))
 	(game (minesweeper-game-sprite-recs minesweeper-game))
 	(recs (minesweeper-game-sprite-recs minesweeper-game))
-	(game-over? (minefield-state-loose? minefield-state)))
+	(total-cells (* (minefield-state-rows minefield-state)
+			(minefield-state-cols minefield-state)))
+	(game-over? (or (minefield-state-loose? minefield-state)
+			(minefield-state-win? minefield-state))))
     (cond
      (game-over?)
      ((IsMouseButtonPressed MOUSE_BUTTON_LEFT)
@@ -141,12 +156,12 @@
 		    (when (CheckCollisionPointRec mousePoint
 						  (vector-ref recs id))
 		      (format #t "hit cell [~a]~%" id)
-		      (set-traveled-field minefield-state id)
-		      ;; (PlaySound (sonar-snd-from  my-assets))
-		      ))
-		  (iota (* 5 4)))))
+		      (set-traveled-field minefield-state id)))
+		  (iota total-cells))))
+     ((IsMouseButtonPressed MOUSE_BUTTON_RIGHT)
+      (PlaySound (sonar-snd-from  assets)))
      ((IsKeyPressed KEY_ENTER)
-      (PlaySound (congrats-snd-from my-assets))))))
+      (PlaySound (congrats-snd-from assets))))))
 
 (define (end-game minesweeper-game)
   (let ((assets (minesweeper-game-assets minesweeper-game)))
