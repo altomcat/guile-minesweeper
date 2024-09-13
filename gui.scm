@@ -76,7 +76,6 @@
 		(cons 'congrats-snd (LoadSound "assets/congrats.wav"))
 		(cons 'all-sprites (list sprites sprite-recs))))
 	 (recs (make-cell-recs rows cols)))
-    (display recs)
     (make-minesweeper-game SCREEN-WIDTH SCREEN-HEIGHT assets recs)))
 
 ;; play intro music
@@ -102,7 +101,7 @@
 	      (PlaySound congrats-snd))))
       
       (if (minefield-state-loose? minefield-state)	
-	  (DrawText "YOU LOOSE!!!" 10 300 20 LIGHTGRAY))
+	  (DrawText "YOU LOOSE!!!" 10 300 20 RED))
       
       (draw-board minesweeper-game minefield-state)
       
@@ -118,7 +117,8 @@
 		       (minesweeper-game-assets minesweeper-game)))
 	 (sprite-texture (car all-sprites))
 	 (board-state (minefield-state-board minefield-state))
-	 (traveled-board (minefield-state-traveled-board minefield-state))
+	 (traveled (minefield-state-traveled-board minefield-state))
+	 (flagged (minefield-state-flagged-board minefield-state))
          (rows (minefield-state-rows minefield-state))
 	 (cols (minefield-state-cols minefield-state)))
     
@@ -127,7 +127,8 @@
 			    (let* ((state (array-ref board-state i j))
 				   (id
 				    (cond
-				     ((not (array-ref traveled-board i j)) HIDDEN-CELL)
+				     ((flagged? flagged i j) FLAG-CELL)
+				     ((not (traveled? traveled i j)) HIDDEN-CELL)
 				     ((= state -1) MINE-CELL)
 				     (else state))))
 			      (DrawTextureRec
@@ -155,11 +156,18 @@
 	(for-each (lambda (id)
 		    (when (CheckCollisionPointRec mousePoint
 						  (vector-ref recs id))
-		      (format #t "hit cell [~a]~%" id)
-		      (set-traveled-field minefield-state id)))
+		      (format #t "left click on cell [~a]~%" id)
+		      (set-traveled minefield-state id)
+		      (mine-discover minefield-state id)))
 		  (iota total-cells))))
      ((IsMouseButtonPressed MOUSE_BUTTON_RIGHT)
-      (PlaySound (sonar-snd-from  assets)))
+      (let ((mousePoint (GetMousePosition)))
+	(for-each (lambda (id)
+		    (when (CheckCollisionPointRec mousePoint
+						  (vector-ref recs id))
+		      (format #t "right click oncell [~a]~%" id)
+		      (set-flagged minefield-state id)))
+		  (iota total-cells))))
      ((IsKeyPressed KEY_ENTER)
       (PlaySound (congrats-snd-from assets))))))
 

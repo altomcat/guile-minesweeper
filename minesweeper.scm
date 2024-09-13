@@ -6,24 +6,33 @@
   #:use-module (ice-9 format)
   #:export (minefield-create
 	    minefield-show
-	    mine?
 	    minefield-state-rows
 	    minefield-state-cols
 	    minefield-state-board
-	    minefield-state-traveled-board
+            minefield-state-traveled-board
+	    minefield-state-flagged-board
+	    minefiel-state-max-flags
+	    set-minefield-max-flags!
 	    minefield-state?
             minefield-state-win?
 	    minefield-state-loose?
-	    set-traveled-field
+	    set-traveled
+	    set-flagged
+	    mine-discover
+	    flagged?
+	    traveled?
+	    traveled-count
 	    ))
 
 (define-record-type <minefield-state>
-  (make-minefield-state rows cols board traveled-board win? loose?)
+  (make-minefield-state rows cols board traveled-board flagged-board max-flags win? loose?)
   minefield-state?
   (rows minefield-state-rows)
   (cols minefield-state-cols)
   (board minefield-state-board)
   (traveled-board minefield-state-traveled-board)
+  (flagged-board minefield-state-flagged-board)
+  (max-flags minefield-max-flags set-minefield-max-flags!)
   (win? minefield-state-win? set-minefield-state-win!)
   (loose? minefield-state-loose? set-minefield-state-loose!))
 
@@ -34,7 +43,8 @@
   (array-set! minefield -1 1 2)
   (array-set! minefield -1 2 2)
 
-  (define traveled-field (make-array #f rows cols))
+  (define traveled (make-array #f rows cols))
+  (define flagged (make-array #f rows cols))
   
   (define (calc-vicinity minefield i j)
     (let ((cur (array-ref minefield i j))
@@ -59,18 +69,27 @@
 	    (iota rows))
   ;; show the board in the console
   (minefield-show minefield)
-  (make-minefield-state rows cols minefield traveled-field #f #f))
+  (make-minefield-state rows cols minefield traveled flagged 0 #f #f))
 
-(define (mine? minefield i j)
-  (equal? -1 (and (array-in-bounds? minefield i j)
-		  (array-ref minefield i j))))
+(define (mine? board row col)
+  (and (array-in-bounds? board row col)
+       (= -1 (array-ref board row col))))
 
-(define (free? minefield i j)
-  (and (not (mine? minefield i j))
-       (>= (array-ref minefield i j ) 0)))
+(define (blank? board row col)
+  (and (array-in-bounds? board row col)
+       (= (array-ref board row col) 0)))
 
-;; (define (mine-discover minefield traveled-field i j)
-;;   (mine? i j))
+(define (free? board row col)
+  (and (array-in-bounds? board row col)
+       (>= (array-ref board row col) 0)))
+
+(define (flagged? flagged-board row col)
+  (and (array-in-bounds? flagged-board row col)
+       (array-ref flagged-board row col)))
+
+(define (traveled? traveled-board row col)
+  (and (array-in-bounds? traveled-board row col)
+       (array-ref traveled-board row col)))
 
 (define (minefield-show minefield)
   (define (toString value)
@@ -88,19 +107,73 @@
 		(newline))
 	      (iota rows))))
 
-(define (set-traveled-field minefield-state id)  
-  (let* ((cols (minefield-state-cols minefield-state))
+(define (set-traveled minefield-state id)  
+  (let* ((rows (minefield-state-cols minefield-state))
+	 (cols (minefield-state-cols minefield-state))
 	 (board (minefield-state-board minefield-state))
-	 (traveled-board (minefield-state-traveled-board minefield-state))
+         (traveled (minefield-state-traveled-board minefield-state))
+         (flagged (minefield-state-flagged-board minefield-state))
 	 (pos (index->position cols id))
 	 (row (car pos))
 	 (col (cadr pos)))
-    (array-set! traveled-board #t row col)
-    (when (win-game? minefield-state)
-      (display "YOU WIN!\n")
-      (set-minefield-state-win! minefield-state #t))
-    (when (= (array-ref board row col) -1)
-      (set-minefield-state-loose! minefield-state #t))))
+    (when (flagged? flagged row col)
+      (array-set! flagged #f row col))
+    (array-set! traveled #t row col)
+    (check-win-or-loose minefield-state row col)
+    ))
+
+(define (mine-discover minefield-state id)
+  (let* ((cols (minefield-state-cols minefield-state))
+	 (pos (index->position cols id))
+	 (row (car pos))
+	 (col (cadr pos)))
+    (mine-discover-helper minefield-state row col 100)
+    (check-win-or-loose minefield-state row col)))
+
+(define (mine-discover-helper minefield-state row col count)
+  (let ((rel-pos '((-1 -1) (0 -1) (1 -1) (-1 0) (1 0) (-1 1) (0 1) (1 1)))
+	(board (minefield-state-board minefield-state))
+        (traveled (minefield-state-traveled-board minefield-state))
+	(flagged (minefield-state-flagged-board minefield-state)))
+    (format #t "Start discovering row=~a col=~a~%" row col)
+    (when  (and (blank? board row col)
+		(>= count 0))		; the counter is for debugging
+      (array-set! traveled #t row col)
+      (array-set! flagged #f row col)
+      (for-each (lambda (v)
+		  (let ((ri (+ row (car v)))
+			(rj (+ col (cadr v))))
+		    (when (and (free? board ri rj)
+			       (not (traveled? traveled ri rj)))
+		      (format #t "count=~a v=~a ri=~a rj=~a~%" count v ri rj)
+		      (format #t "blank?=~a traveled?=~a~%" (blank? board ri rj)
+			      (traveled? traveled ri rj))
+		      (array-set! traveled #t ri rj)
+		      (array-set! flagged #f ri rj)
+		      (mine-discover-helper minefield-state ri rj (1- count))))) 
+		rel-pos))))
+
+(define (check-win-or-loose minefield-state row col)
+  (let ((board (minefield-state-board minefield-state)))
+    (if (mine? board row col)
+	(begin
+	  (display "YOU LOOSE!\n")
+	  (set-minefield-state-loose! minefield-state #t))
+	(when (win-game? minefield-state)
+	  (display "YOU WIN!\n")
+	  (set-minefield-state-win! minefield-state #t)))))
+
+(define (set-flagged minefield-state id)
+  (let* ((traveled (minefield-state-traveled-board minefield-state))
+	 (flagged (minefield-state-flagged-board minefield-state))
+	 (pos (index->position cols id))
+	 (row (car pos))
+	 (col (cadr pos)))
+    (unless (traveled? traveled row col)
+      ;;      (display "not traveled\n")
+      (if (flagged? flagged row col)
+	  (array-set! flagged #f row col)
+	  (array-set! flagged #t row col)))))
 
 (define (index->position cols id)
   (let ((row (euclidean-quotient id cols))
@@ -152,9 +225,9 @@
 (define t (minefield-state-traveled-board board-state))
 (define cols (minefield-state-cols board-state))
 
-(set-traveled-field board-state 0)
-(set-traveled-field board-state 10)
-(set-traveled-field board-state 19)
+(set-traveled board-state 0)
+(set-traveled board-state 10)
+(set-traveled board-state 19)
 (mine-count board-state)
 (test-begin "tests")
 

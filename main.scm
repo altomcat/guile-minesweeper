@@ -11,7 +11,10 @@
 (define minefield-data
   (minefield-create ROWS COLS))
 
-(format #t "minesweeper? => ~a" (gui:minesweeper-game-width my-game))
+;; define the number of available flags
+(set-minefield-max-flags! minefield-data 8)
+
+(format #t "minesweeper? => ~a~%" (gui:minesweeper-game-width my-game))
 
 (gui:intro-game my-game)
 (gui:main-game my-game minefield-data)
