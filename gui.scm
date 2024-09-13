@@ -14,8 +14,8 @@
 	    minesweeper-game-assets))
 
 ;; define margins
-(define START-X 10)
-(define START-Y 10)
+(define START-X 50)
+(define START-Y 50)
 
 (define EMPTY-CELL 0)
 (define FLAG-CELL 5)
@@ -41,8 +41,8 @@
   (sprite-recs minesweeper-game-sprite-recs))
 
 (define (init-game rows cols)  
-  (define SCREEN-WIDTH (+ (* 2 10) (* 64 cols)))
-  (define SCREEN-HEIGHT (+ (* 2 50) (* 64 rows)))
+  (define SCREEN-WIDTH (+ (* 2 START-X) (* 64 cols)))
+  (define SCREEN-HEIGHT (+ (* 2 START-Y) (* 64 rows)))
   
   (InitWindow SCREEN-WIDTH SCREEN-HEIGHT "Minesweeper")
   (InitAudioDevice)
@@ -58,8 +58,10 @@
   ;; calculate rectangle occupied with cells
   (define (make-cell-recs rows cols)
     (list->vector (map (lambda (i)
-			 (let* ((x (+ (* 64.0 (modulo i cols))))
-				(y (+ (* 64.0 (euclidean-quotient i cols)))))
+			 (let* ((x (+ (* 64.0 (modulo i cols))
+				      START-X))
+				(y (+ (* 64.0 (euclidean-quotient i cols))
+				      START-Y)))
 			   ;; (format #t "x=~a y=~a~%" x y)
 			   (make-Rectangle x y 64 64)))
 		       (iota (* rows cols)))))
