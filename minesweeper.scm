@@ -5,6 +5,7 @@
   #:use-module (srfi srfi-64)
   #:use-module (ice-9 format)
   #:export (minefield-create
+	    minefield-build
 	    minefield-show
 	    minefield-state-rows
 	    minefield-state-cols
@@ -25,7 +26,9 @@
 	    ))
 
 (define-record-type <minefield-state>
-  (make-minefield-state rows cols board traveled-board flagged-board max-flags win? loose?)
+  (make-minefield-state rows cols board
+			traveled-board flagged-board
+			max-flags win? loose?)
   minefield-state?
   (rows minefield-state-rows)
   (cols minefield-state-cols)
@@ -36,6 +39,43 @@
   (win? minefield-state-win? set-minefield-state-win!)
   (loose? minefield-state-loose? set-minefield-state-loose!))
 
+(define (calc-vicinity minefield i j)
+  (let ((cur (array-ref minefield i j))
+        (ij '((-1 -1) (0 -1) (1 -1) (-1 0) (1 0) (-1 1) (0 1) (1 1))))
+    (unless (mine? minefield i j)
+      (let ((res (fold + 0
+		       (map (lambda (v)
+			      (let ((ri (+ i (car v)))
+                                    (rj (+ j (cadr v))))
+                                (or (and (mine? minefield ri rj)
+                                         1)
+                                    0)))
+                            ij))))
+        (when (> res 0)
+          (array-set! minefield res i j))))))
+
+(define (minefield-build board)
+  (let* ((dimensions (array-dimensions board))
+	 (rows (car dimensions))
+	 (cols (cadr dimensions))
+	 (minefield (make-typed-array 's8 0 rows cols))
+	 (traveled (make-array #f rows cols))
+	 (flagged (make-array #f rows cols)))
+    (array-copy! board minefield)
+    
+    ;; calculate the vicinity of mines
+    (for-each (lambda (i)
+		(for-each (lambda (j)
+			    (calc-vicinity minefield i j))
+			  (iota cols)))
+	      (iota rows))
+    ;; show the board in the console
+    (minefield-show minefield)
+    (make-minefield-state rows cols
+			  minefield traveled
+			  flagged 0
+			  #f #f)))
+
 (define (minefield-create rows cols)  
   (define minefield (make-typed-array 's8 0 rows cols))
   (array-set! minefield -1 0 1)
@@ -45,21 +85,8 @@
 
   (define traveled (make-array #f rows cols))
   (define flagged (make-array #f rows cols))
+
   
-  (define (calc-vicinity minefield i j)
-    (let ((cur (array-ref minefield i j))
-          (ij '((-1 -1) (0 -1) (1 -1) (-1 0) (1 0) (-1 1) (0 1) (1 1))))
-      (unless (mine? minefield i j)
-        (let ((res (fold + 0
-                         (map (lambda (v)
-                                (let ((ri (+ i (car v)))
-                                      (rj (+ j (cadr v))))
-                                  (or (and (mine? minefield ri rj)
-                                           1)
-                                      0)))
-                              ij))))
-          (when (> res 0)
-            (array-set! minefield res i j))))))
   
   ;; calculate the vicinity of mines
   (for-each (lambda (i)
@@ -73,7 +100,7 @@
 
 (define (mine? board row col)
   (and (array-in-bounds? board row col)
-       (= -1 (array-ref board row col))))
+       (= (array-ref board row col) -1)))
 
 (define (blank? board row col)
   (and (array-in-bounds? board row col)
@@ -108,19 +135,16 @@
 	      (iota rows))))
 
 (define (set-traveled minefield-state id)  
-  (let* ((rows (minefield-state-cols minefield-state))
-	 (cols (minefield-state-cols minefield-state))
-	 (board (minefield-state-board minefield-state))
-         (traveled (minefield-state-traveled-board minefield-state))
-         (flagged (minefield-state-flagged-board minefield-state))
+  (let* ((cols (minefield-state-cols minefield-state))
+	 (traveled (minefield-state-traveled-board minefield-state))
+	 (flagged (minefield-state-flagged-board minefield-state))
 	 (pos (index->position cols id))
 	 (row (car pos))
 	 (col (cadr pos)))
     (when (flagged? flagged row col)
       (array-set! flagged #f row col))
     (array-set! traveled #t row col)
-    (check-win-or-loose minefield-state row col)
-    ))
+    (check-win-or-loose minefield-state row col)))
 
 (define (mine-discover minefield-state id)
   (let* ((cols (minefield-state-cols minefield-state))
@@ -164,7 +188,8 @@
 	  (set-minefield-state-win! minefield-state #t)))))
 
 (define (set-flagged minefield-state id)
-  (let* ((traveled (minefield-state-traveled-board minefield-state))
+  (let* ((cols (minefield-state-cols minefield-state))
+	 (traveled (minefield-state-traveled-board minefield-state))
 	 (flagged (minefield-state-flagged-board minefield-state))
 	 (pos (index->position cols id))
 	 (row (car pos))
@@ -177,7 +202,7 @@
 
 (define (index->position cols id)
   (let ((row (euclidean-quotient id cols))
-	(col (modulo id cols)))
+	(col (euclidean-remainder id cols)))
     (list row col)))
 
 (define (win-game? minefield-state)
@@ -220,6 +245,9 @@
 
 ;; Unit tests
 ;;
+
+(test-begin "tests")
+
 (define board-state (minefield-create 4 5))
 (define m (minefield-state-board board-state))
 (define t (minefield-state-traveled-board board-state))
@@ -229,7 +257,6 @@
 (set-traveled board-state 10)
 (set-traveled board-state 19)
 (mine-count board-state)
-(test-begin "tests")
 
 (test-assert (equal? (index->position cols 0) '(0 0)))
 (test-assert (equal? (index->position cols 10) '(2 0)))
@@ -243,20 +270,3 @@
 (test-assert (equal? (mine-count board-state) 4))
 (test-end "tests")
 
-;; (newline)
-;; (format #t "minefield => ~a" board)
-;; (newline)
-;; (map (lambda (coor)
-;;        (let ((i (car coor))
-;; 	     (j (cadr coor)))
-;; 	 (format #t "free cell? ~a i=~a j=~a~%" (free? board i j) i j)))
-;;      (list '(0 0) '(0 1) '(0 2) '(2 0)))
-;; ;;(format #t "free cell? ~a i=~a j=~a" (free? board 0 0) 0 0)
-;; (newline)
-
-
-;; (define minefield
-;;   #2s8((0 -1  0 -1  0)
-;; 	 (0  0 -1  0  0)
-;; 	 (0  0 -1  0  0)
-;; 	 (0  0  0  0  0)))

@@ -2,19 +2,41 @@
 	     (ice-9 format)
 	     (minesweeper))
 
-(define ROWS 4)
-(define COLS 5)
+(define minefield-test1
+  #2s8(( 0 -1  0 -1  0)
+       ( 0  0 -1  0  0)
+       ( 0  0 -1  0  0)
+       ( 0  0  0  0  0)))
+
+(define minefield-test2
+  #2s8(( 0  0  0  0  0  0 -1  0  0  0)
+       ( 0  0  0  0  0  0  0  0  0  0)
+       ( 0  0  0 -1  0  0  0  0  0  0)
+       ( 0  0  0  0  0  0  0  0  0  0)
+       ( 0  0  0  0  0  0 -1 -1 -1  0)
+       ( 0  0  0  0  0  0  0  0  0  0)
+       (-1  0  0  0 -1  0  0  0  0 -1)
+       ( 0  0  0  0 -1  0  0  0  0  0)
+       ( 0  0  0  0  0  0  0  0 -1  0)
+       ( 0  0  0  0  0  0  0  0  0 -1)))
+
+(define minefield-test minefield-test2)
 
 (define my-game
-  (gui:init-game ROWS COLS))
+  (let* ((dimensions (array-dimensions minefield-test))
+	 (rows (car dimensions))
+	 (cols (cadr dimensions)))
+    (gui:init-game rows cols)))
 
 (define minefield-data
-  (minefield-create ROWS COLS))
+  (minefield-build minefield-test)
+  )
 
 ;; define the number of available flags
 (set-minefield-max-flags! minefield-data 8)
 
-(format #t "minesweeper? => ~a~%" (gui:minesweeper-game-width my-game))
+;; (format #t "minesweeper? => ~a~%"
+;; 	(gui:minesweeper-game-width my-game))
 
 (gui:intro-game my-game)
 (gui:main-game my-game minefield-data)

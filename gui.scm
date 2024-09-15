@@ -58,9 +58,9 @@
   ;; calculate rectangle occupied with cells
   (define (make-cell-recs rows cols)
     (list->vector (map (lambda (i)
-			 (let* ((x (+ (* 64.0 (modulo i cols))
+			 (let* ((x (+ (* 64 (modulo i cols))
 				      START-X))
-				(y (+ (* 64.0 (euclidean-quotient i cols))
+				(y (+ (* 64 (euclidean-quotient i cols))
 				      START-Y)))
 			   ;; (format #t "x=~a y=~a~%" x y)
 			   (make-Rectangle x y 64 64)))
@@ -98,18 +98,18 @@
       (if (minefield-state-win? minefield-state)
 	  (let ((congrats-snd (congrats-snd-from
 			       (minesweeper-game-assets minesweeper-game))))
-            (DrawText "YOU WIN!!!" 10 300 20 GREEN)
+            (DrawText "YOU WIN!!!" 10 10 20 GREEN)
 	    (unless (IsSoundPlaying congrats-snd)
 	      (PlaySound congrats-snd))))
       
       (if (minefield-state-loose? minefield-state)	
-	  (DrawText "YOU LOOSE!!!" 10 300 20 RED))
+	  (DrawText "YOU LOOSE!!!" 10 10 20 RED))
       
       (draw-board minesweeper-game minefield-state)
       
       (unless (or (minefield-state-win? minefield-state)
 		  (minefield-state-loose? minefield-state))
-	(DrawText "Playing Minesweeper ..." 10 300 20 LIGHTGRAY))
+	(DrawText "Playing Minesweeper ..." 10 10 20 LIGHTGRAY))
 
       (EndDrawing)
       (loop (WindowShouldClose)))))
