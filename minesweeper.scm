@@ -179,13 +179,19 @@
 
 (define (check-win-or-loose minefield-state row col)
   (let ((board (minefield-state-board minefield-state)))
-    (if (mine? board row col)
-	(begin
-	  (display "YOU LOOSE!\n")
-	  (set-minefield-state-loose! minefield-state #t))
-	(when (win-game? minefield-state)
-	  (display "YOU WIN!\n")
-	  (set-minefield-state-win! minefield-state #t)))))
+    (cond
+     ((and (mine? board row col)
+	   (= (traveled-count minefield-state) 1))
+      (display "BAD LUCK, RESTART GAME!\n")
+      'game-restart)
+     ((mine? board row col)
+      (display "YOU LOOSE!\n")
+      (set-minefield-state-loose! minefield-state #t)
+      'game-loose)
+     ((win-game? minefield-state)
+      (display "YOU WIN!\n")
+      (set-minefield-state-win! minefield-state #t)
+      'game-win))))
 
 (define (set-flagged minefield-state id)
   (let* ((cols (minefield-state-cols minefield-state))
