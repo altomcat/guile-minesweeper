@@ -6,6 +6,7 @@
   #:use-module (ice-9 format)
   #:export (minefield-create
 	    minefield-build
+	    minefield-random
 	    minefield-show
 	    minefield-state-rows
 	    minefield-state-cols
@@ -54,6 +55,34 @@
         (when (> res 0)
           (array-set! minefield res i j))))))
 
+(define (minefield-random rows cols max-mines)
+  (let ((minefield (make-typed-array 's8 0 rows cols))
+	(traveled (make-array #f rows cols))
+	(flagged (make-array #f rows cols))
+	(seed (random-state-from-platform)))
+
+    (if (>= max-mines (* rows cols))
+	(display "Too much mines for the board...")
+	(let loop ((i 0))
+	  (if (< i max-mines)
+	      (let ((row (random rows seed))
+		    (col (random cols seed)))
+		(if (= (array-ref minefield row col) 0)
+		    (begin 
+		      (array-set! minefield -1 row col)
+		      (loop (1+ i)))
+		    (loop i))))))
+    ;; calculate the vicinity of mines
+    (for-each (lambda (i)
+		(for-each (lambda (j)
+			    (calc-vicinity minefield i j))
+			  (iota cols)))
+	      (iota rows))
+
+    ;; show the board in the console
+    (minefield-show minefield)
+    (make-minefield-state rows cols minefield traveled flagged 0 #f #f)))
+
 (define (minefield-build board)
   (let* ((dimensions (array-dimensions board))
 	 (rows (car dimensions))
@@ -69,6 +98,7 @@
 			    (calc-vicinity minefield i j))
 			  (iota cols)))
 	      (iota rows))
+    
     ;; show the board in the console
     (minefield-show minefield)
     (make-minefield-state rows cols
@@ -86,8 +116,6 @@
   (define traveled (make-array #f rows cols))
   (define flagged (make-array #f rows cols))
 
-  
-  
   ;; calculate the vicinity of mines
   (for-each (lambda (i)
 	      (for-each (lambda (j)

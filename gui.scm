@@ -13,7 +13,7 @@
 	    minesweeper-game-height
 	    minesweeper-game-assets))
 
-;; define margins
+;; define board margins
 (define START-X 50)
 (define START-Y 50)
 
