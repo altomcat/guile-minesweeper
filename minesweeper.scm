@@ -17,7 +17,8 @@
 	    set-minefield-max-flags!
 	    minefield-state?
             minefield-state-win?
-	    minefield-state-loose?
+            minefield-state-loose?
+            minefield-state-restart?
 	    set-traveled
 	    set-flagged
 	    mine-discover
@@ -29,7 +30,7 @@
 (define-record-type <minefield-state>
   (make-minefield-state rows cols board
 			traveled-board flagged-board
-			max-flags win? loose?)
+			max-flags win? loose? restart?)
   minefield-state?
   (rows minefield-state-rows)
   (cols minefield-state-cols)
@@ -38,7 +39,8 @@
   (flagged-board minefield-state-flagged-board)
   (max-flags minefield-max-flags set-minefield-max-flags!)
   (win? minefield-state-win? set-minefield-state-win!)
-  (loose? minefield-state-loose? set-minefield-state-loose!))
+  (loose? minefield-state-loose? set-minefield-state-loose!)
+  (restart? minefield-state-restart? set-minefield-state-restart!))
 
 (define (calc-vicinity minefield i j)
   (let ((cur (array-ref minefield i j))
@@ -81,7 +83,7 @@
 
     ;; show the board in the console
     (minefield-show minefield)
-    (make-minefield-state rows cols minefield traveled flagged 0 #f #f)))
+    (make-minefield-state rows cols minefield traveled flagged 0 #f #f #f)))
 
 (define (minefield-build board)
   (let* ((dimensions (array-dimensions board))
@@ -104,7 +106,7 @@
     (make-minefield-state rows cols
 			  minefield traveled
 			  flagged 0
-			  #f #f)))
+			  #f #f #f)))
 
 (define (minefield-create rows cols)  
   (define minefield (make-typed-array 's8 0 rows cols))
@@ -124,7 +126,7 @@
 	    (iota rows))
   ;; show the board in the console
   (minefield-show minefield)
-  (make-minefield-state rows cols minefield traveled flagged 0 #f #f))
+  (make-minefield-state rows cols minefield traveled flagged 0 #f #f #f))
 
 (define (mine? board row col)
   (and (array-in-bounds? board row col)
@@ -211,15 +213,13 @@
      ((and (mine? board row col)
 	   (= (traveled-count minefield-state) 1))
       (display "BAD LUCK, RESTART GAME!\n")
-      'game-restart)
+      (set-minefield-state-restart! minefield-state #t))
      ((mine? board row col)
       (display "YOU LOOSE!\n")
-      (set-minefield-state-loose! minefield-state #t)
-      'game-loose)
+      (set-minefield-state-loose! minefield-state #t))
      ((win-game? minefield-state)
       (display "YOU WIN!\n")
-      (set-minefield-state-win! minefield-state #t)
-      'game-win))))
+      (set-minefield-state-win! minefield-state #t)))))
 
 (define (set-flagged minefield-state id)
   (let* ((cols (minefield-state-cols minefield-state))
