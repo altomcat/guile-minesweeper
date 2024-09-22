@@ -35,12 +35,16 @@
 (define-accessor all-sprites-from 'all-sprites)
 
 (define-record-type <minesweeper-game>
-  (make-minesweeper-game width-screen height-screen assets sprite-recs)
+  (make-minesweeper-game width-screen height-screen
+			 assets sprite-recs
+			 clock state)
   minesweeper-game?
   (width-screen minesweeper-game-width)
   (height-screen minesweeper-game-height)
   (assets minesweeper-game-assets)
-  (sprite-recs minesweeper-game-sprite-recs))
+  (sprite-recs minesweeper-game-sprite-recs)
+  (clock minesweeper-game-clock minesweeper-game-set-clock!)
+  (state minesweeper-game-state minesweeper-game-set-state!))
 
 (define (init-game rows cols)
   (define SCREEN-WIDTH (+ (* 2 START-X) (* 64 cols)))
@@ -77,8 +81,11 @@
 		(cons 'sonar-snd (LoadSound "assets/mine.wav"))
 		(cons 'congrats-snd (LoadSound "assets/congrats.wav"))
 		(cons 'all-sprites (list sprites sprite-recs))))
-	 (recs (make-cell-recs rows cols)))
-    (make-minesweeper-game SCREEN-WIDTH SCREEN-HEIGHT assets recs)))
+	 (recs (make-cell-recs rows cols))
+	 (clock (GetTime)))
+    (make-minesweeper-game SCREEN-WIDTH SCREEN-HEIGHT
+			   assets recs
+			   clock 'running)))
 
 ;; play intro music
 (define (intro-game minesweeper-game)
@@ -113,7 +120,13 @@
 	      (DrawText "YOU LOOSE!!!" 10 10 20 RED))
 	     ((not (or (minefield-state-win? minefield-state)
 		       (minefield-state-loose? minefield-state)))
-	      (DrawText "Playing Minesweeper ..." 10 10 20 LIGHTGRAY)))
+              (DrawText "Playing Minesweeper ..." 10 10 20 LIGHTGRAY)
+	      (let* ((width (minesweeper-game-width minesweeper-game))
+		     (elapsed-time (- (GetTime) (minesweeper-game-clock minesweeper-game)))
+		     (s (elapsed-time->string elapsed-time))
+		     (x (- width (* 10 (string-length s)))))
+		(DrawText s x 10 20 LIGHTGRAY))
+	      ))
 
 	    (EndDrawing)
 	    (loop (WindowShouldClose)))))))
@@ -201,3 +214,13 @@
 			  (iota cols))
 		(newline))
 	      (iota rows))))
+
+(define (elapsed-time->string t)
+  "Returns a clock formatted string from current elapsed time."
+  (let* ((hour (inexact->exact
+		(floor (euclidean/ t 3600))))
+	 (minute (inexact->exact
+		  (floor (/ (euclidean-remainder t 3600) 60))))
+	 (second (inexact->exact
+		  (floor (euclidean-remainder t 60)))))
+    (format #f "Elapsed time : ~2,'0d:~2,'0d:~2,'0d" hour minute second)))
