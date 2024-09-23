@@ -2,46 +2,24 @@
 	     (ice-9 format)
 	     (minesweeper))
 
-;; (define minefield-test1
-;;   #2s8(( 0 -1  0 -1  0)
-;;        ( 0  0 -1  0  0)
-;;        ( 0  0 -1  0  0)
-;;        ( 0  0  0  0  0)))
-
-;; (define minefield-test2
-;;   #2s8(( 0  0  0  0  0  0 -1  0  0  0)
-;;        ( 0  0  0  0  0  0  0  0  0  0)
-;;        ( 0  0  0 -1  0  0  0  0  0  0)
-;;        ( 0  0  0  0  0  0  0  0  0  0)
-;;        ( 0  0  0  0  0  0 -1 -1 -1  0)
-;;        ( 0  0  0  0  0  0  0  0  0  0)
-;;        (-1  0  0  0 -1  0  0  0  0 -1)
-;;        ( 0  0  0  0 -1  0  0  0  0  0)
-;;        ( 0  0  0  0  0  0  0  0 -1  0)
-;;        ( 0  0  0  0  0  0  0  0  0 -1)))
-
-;; (define minefield-test minefield-test2)
-
 (define ROWS 10)
 (define COLS 10)
 
-(define my-game
-  ;; (let* ((dimensions (array-dimensions minefield-test))
-  ;; 	 (rows (car dimensions))
-  ;; 	 (cols (cadr dimensions)))
-  ;;   (gui:init-game rows cols))
-  (gui:init-game ROWS COLS))
+(gui:init-raylib ROWS COLS)
 
-(define minefield-data
-  ;; (minefield-build minefield-test)
-  (minefield-random ROWS COLS 10))
+(define (run game acc)
+  (let* ((minefield (minefield-random ROWS COLS 10))
+	 (intro (and (= acc 0)
+		     (gui:intro-game game)))
+	 (result (begin
+		   ;; define the number of available flags
+		   (set-minefield-max-flags! minefield 3)
+		   (gui:main-game game minefield))))
+    (display (gui:minesweeper-game-clock game))
+    (gui:end-game game)
+    (when (equal? result 'restart)
+      (run (gui:init-game ROWS COLS) (1+ acc)))))
 
-;; define the number of available flags
-(set-minefield-max-flags! minefield-data 3)
-
-;; (format #t "minesweeper? => ~a~%"
-;; 	(gui:minesweeper-game-width my-game))
-
-(gui:intro-game my-game)
-(gui:main-game my-game minefield-data)
-(gui:end-game my-game)
+(define start
+  (and (run (gui:init-game ROWS COLS) 0)
+       (gui:end-raylib)))

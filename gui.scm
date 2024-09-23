@@ -4,14 +4,22 @@
   #:use-module (srfi srfi-1)
   #:use-module (srfi srfi-9)
   #:use-module (ice-9 match)
-  #:export (init-game
+  #:export (init-raylib
+	    init-game
 	    intro-game
 	    main-game
 	    end-game
+	    end-raylib
 	    minesweeper-game?
 	    minesweeper-game-width
 	    minesweeper-game-height
-	    minesweeper-game-assets))
+	    minesweeper-game-assets
+	    minesweeper-game-clock
+	    minesweeper-game-state
+	    clock?
+	    clock-elapsed-time
+	    clock-ref-time
+	    ))
 
 ;; define board margins
 (define START-X 50)
@@ -34,6 +42,12 @@
 (define-accessor congrats-snd-from 'congrats-snd)
 (define-accessor all-sprites-from 'all-sprites)
 
+(define-record-type <clock>
+  (make-clock elapsed-time ref-time)
+  clock?
+  (elapsed-time clock-elapsed-time clock-elapsed-time-set!)
+  (ref-time clock-ref-time clock-ref-time-set!))
+
 (define-record-type <minesweeper-game>
   (make-minesweeper-game width-screen height-screen
 			 assets sprite-recs
@@ -43,18 +57,27 @@
   (height-screen minesweeper-game-height)
   (assets minesweeper-game-assets)
   (sprite-recs minesweeper-game-sprite-recs)
-  (clock minesweeper-game-clock minesweeper-game-set-clock!)
-  (state minesweeper-game-state minesweeper-game-set-state!))
+  (clock minesweeper-game-clock)
+  (state minesweeper-game-state minesweeper-game-state-set!))
+
+(define (init-raylib rows cols)
+  (let ((w (get-screen-width cols))
+	(h (get-screen-height rows)))
+    (InitWindow w h "Minesweeper")
+    (InitAudioDevice)
+    (SetTargetFPS 60)))
+
+(define (end-raylib)
+  (CloseAudioDevice)
+  (CloseWindow))
+
+(define (get-screen-width cols)
+  (+ (* 2 START-X) (* 64 cols)))
+
+(define (get-screen-height rows)
+  (+ (* 2 START-Y) (* 64 rows)))
 
 (define (init-game rows cols)
-  (define SCREEN-WIDTH (+ (* 2 START-X) (* 64 cols)))
-  (define SCREEN-HEIGHT (+ (* 2 START-Y) (* 64 rows)))
-
-  (InitWindow SCREEN-WIDTH SCREEN-HEIGHT "Minesweeper")
-  (InitAudioDevice)
-
-  (SetTargetFPS 60)
-
   (define sprites (LoadTexture "assets/minesweeper-sprites.png"))
   (define SPRITE-WIDTH (Texture-width sprites))
   (define SPRITE-HEIGHT (euclidean-quotient (Texture-height sprites) MAX-SPRITES))
@@ -66,11 +89,12 @@
 				      START-X))
 				(y (+ (* 64 (euclidean-quotient i cols))
 				      START-Y)))
-			   ;; (format #t "x=~a y=~a~%" x y)
-			   (make-Rectangle x y 64 64)))
+                           (make-Rectangle x y 64 64)))
 		       (iota (* rows cols)))))
 
-  (let* ((sprite-recs (map (lambda (n)
+  (let* ((w (get-screen-width cols))
+	 (h (get-screen-height rows))
+	 (sprite-recs (map (lambda (n)
 			     (make-Rectangle 0
 					     (* n SPRITE-HEIGHT)
 					     SPRITE-WIDTH
@@ -82,57 +106,79 @@
 		(cons 'congrats-snd (LoadSound "assets/congrats.wav"))
 		(cons 'all-sprites (list sprites sprite-recs))))
 	 (recs (make-cell-recs rows cols))
-	 (clock (GetTime)))
-    (make-minesweeper-game SCREEN-WIDTH SCREEN-HEIGHT
-			   assets recs
-			   clock 'running)))
+	 (t (make-clock 0 0)))
+    (make-minesweeper-game w h assets recs t 'running)))
 
 ;; play intro music
 (define (intro-game minesweeper-game)
-  (let ((assets (minesweeper-game-assets minesweeper-game)))
-    (PlaySound (sea-snd-from assets))))
+(let ((assets (minesweeper-game-assets minesweeper-game)))
+  (PlaySound (sea-snd-from assets))))
 
 ;; main Raylib loop
 (define (main-game minesweeper-game minefield-state)
-  (let loop ((exitWindow #f))
+  (set-clock-ref minesweeper-game)
+  (let loop ((exitWindow (WindowShouldClose)))
     (unless exitWindow
       (manage-key-event minesweeper-game minefield-state)
+      
       ;; lucky me for the first click!
-      (if (minefield-state-restart? minefield-state)
-	  (let* ((rows (minefield-state-rows minefield-state))
-		 (cols (minefield-state-cols minefield-state))
-		 (new-minefield-state (minefield-random rows cols 10)))
-	    (main-game minesweeper-game new-minefield-state))
-	  (begin
-	    (BeginDrawing)
-	    (ClearBackground RAYWHITE)
+      (when (minefield-state-restart? minefield-state)
+        (let ((res (restart minesweeper-game minefield-state)))
+	  (loop #t)))
 
-	    (draw-board minesweeper-game minefield-state)
+      (BeginDrawing)
+      (ClearBackground RAYWHITE)
 
-	    (cond
-	     ((minefield-state-win? minefield-state)
-	      (let ((congrats-snd (congrats-snd-from
-				   (minesweeper-game-assets minesweeper-game))))
-		(DrawText "YOU WIN!!!" START-X 10 20 GREEN)
-		(unless (IsSoundPlaying congrats-snd)
-		  (PlaySound congrats-snd))))
-	     ((minefield-state-loose? minefield-state)
-	      (DrawText "YOU LOOSE!!!" START-X 10 20 RED))
-	     ((not (or (minefield-state-win? minefield-state)
-		       (minefield-state-loose? minefield-state)))
-	      (if (equal? (minesweeper-game-state minesweeper-game) 'running)
-		  (begin 
-                    (DrawText "Playing Minesweeper ..." START-X 10 20 LIGHTGRAY)
-		    (let* ((width (minesweeper-game-width minesweeper-game))
-			   (elapsed-time (- (GetTime)
-					    (minesweeper-game-clock minesweeper-game)))
-			   (s (elapsed-time->string elapsed-time))
-			   (x (- width (* 10 (string-length s)) START-X)))
-		      (DrawText s x 10 20 LIGHTGRAY)))
-		  (begin
-		    (DrawText "Pause ..." START-X 10 20 LIGHTGRAY)))))
-	    (EndDrawing)
-	    (loop (WindowShouldClose)))))))
+      (draw-board minesweeper-game minefield-state)
+
+      (cond
+       ((minefield-state-win? minefield-state)
+	(let ((congrats-snd (congrats-snd-from
+			     (minesweeper-game-assets minesweeper-game))))
+	  
+	  (DrawText "YOU WIN!!!" START-X 10 20 GREEN)
+	  (when (not (equal? (minesweeper-game-state minesweeper-game)
+			     'stop))
+            (minesweeper-game-state-set! minesweeper-game 'stop)
+	    (freeze-elapsed-time minesweeper-game)
+	    (PlaySound congrats-snd))))
+       ((minefield-state-loose? minefield-state)
+	(DrawText "YOU LOOSE!!!" START-X 10 20 RED)
+	(when (not (equal? (minesweeper-game-state minesweeper-game)
+			   'stop))
+	  (minesweeper-game-state-set! minesweeper-game 'stop)
+	  (freeze-elapsed-time minesweeper-game)))
+       ((not (or (minefield-state-win? minefield-state)
+		 (minefield-state-loose? minefield-state)))
+	(cond
+         ((equal? (minesweeper-game-state minesweeper-game) 'running)
+	  (DrawText "Playing Minesweeper ..." START-X 10 20 LIGHTGRAY))
+	 ((equal? (minesweeper-game-state minesweeper-game) 'restart)
+	  (DrawText "Restarting ..." START-X 10 20 LIGHTGRAY))
+	 ((equal? (minesweeper-game-state minesweeper-game) 'pause)
+	  (DrawText "Pause ..." START-X 10 20 LIGHTGRAY)))))
+
+      ;; update clock
+      (let* ((width (minesweeper-game-width minesweeper-game))
+	     (clock (minesweeper-game-clock minesweeper-game))
+	     (t (+ (clock-elapsed-time clock)
+		   (if (equal? (minesweeper-game-state minesweeper-game) 'running)
+		       (- (GetTime) (clock-ref-time clock))
+		       0)))
+	     (s (elapsed-time->string t))
+	     (x (- width (* 10 (string-length s)) START-X)))
+	(DrawText s x 10 20 LIGHTGRAY))
+
+      (EndDrawing)
+      (loop (or (game-restart? minesweeper-game)
+		(WindowShouldClose)))))
+  (format #t "This is the end...~%")
+  (let ((res (minesweeper-game-state minesweeper-game)))
+    (format #t "Return ~a\n" res)
+    (minesweeper-game-state-set! minesweeper-game 'running)
+    (freeze-elapsed-time minesweeper-game)
+    res)
+  )
 
 (define (draw-board minesweeper-game minefield-state)
   (let* ((all-sprites (all-sprites-from
@@ -192,17 +238,28 @@
 		  (iota total-cells))))
      ((IsKeyPressed KEY_P)
       (if (equal? (minesweeper-game-state minesweeper-game) 'running)
-	  (minesweeper-game-set-state! minesweeper-game 'pause)
-	  (minesweeper-game-set-state! minesweeper-game 'running))))))
+	  (begin
+            (freeze-elapsed-time minesweeper-game) ; run => pause
+	    (minesweeper-game-state-set! minesweeper-game 'pause))
+	  (begin
+	    (set-clock-ref minesweeper-game) ; pause => run
+	    (minesweeper-game-state-set! minesweeper-game 'running))))
+     ((IsKeyPressed KEY_R)
+      ;;(freeze-elapsed-time minesweeper-game)
+      (minesweeper-game-state-set! minesweeper-game 'restart)))))
 
 (define (end-game minesweeper-game)
   (let ((assets (minesweeper-game-assets minesweeper-game)))
     (UnloadTexture (car (all-sprites-from assets)))
     (UnloadSound (sea-snd-from assets))
     (UnloadSound (sonar-snd-from assets))
-    (UnloadSound (congrats-snd-from assets))
-    (CloseAudioDevice)
-    (CloseWindow)))
+    (UnloadSound (congrats-snd-from assets))))
+
+(define (restart game board)
+  (let* ((rows (minefield-state-rows board))
+	 (cols (minefield-state-cols board))
+	 (new-board (minefield-random rows cols 10)))
+    (main-game game new-board)))
 
 (define (minefield-show minefield)
   (define (toString value)
@@ -229,3 +286,18 @@
 	 (second (inexact->exact
 		  (floor (euclidean-remainder t 60)))))
     (format #f "Elapsed time : ~2,'0d:~2,'0d:~2,'0d" hour minute second)))
+
+(define (set-clock-ref game)
+  "Set reference clock to current time."
+  (let ((clock (minesweeper-game-clock game)))
+    (clock-ref-time-set! clock (GetTime))))
+
+(define (freeze-elapsed-time game)
+  "Update elapsed time based on reference clock."
+  (let* ((clock (minesweeper-game-clock game))
+	 (elapsed-time (+ (clock-elapsed-time clock)
+			  (- (GetTime) (clock-ref-time clock)))))
+    (clock-elapsed-time-set! clock elapsed-time)))
+
+(define (game-restart? game)
+  (equal? (minesweeper-game-state game) 'restart))
