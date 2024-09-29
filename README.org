@@ -1,0 +1,16 @@
+* About this project
+
+This is a simple minesweeper made with guile scheme and the graphics library called Raylib.
+
+At the beginning, I planed to build a more advanced definition package for the [[https://github.com/petelliott/raylib-guile][guile-raylib]] bindings for Guix.
+Then, I started to build a game to learn scheme in a practical way and to discover Raylib at the same time.
+
+If you are a Guix user, you can add my channel and install the guile-raylib package. I will submit the definition package in a short time. Else, you should install and build the guile-raylib bindings first from the source
+
+In the root project, you will find a manifest to set up the project:
+
+#+begin_src sh
+guix shell
+guile main.scm
+#+end_src)
+
