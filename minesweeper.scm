@@ -180,8 +180,10 @@
   (let* ((cols (minefield-state-cols minefield-state))
 	 (pos (index->position cols id))
 	 (row (car pos))
-	 (col (cadr pos)))
-    (mine-discover-helper minefield-state row col 100)
+	 (col (cadr pos))
+	 (count (* (minefield-state-rows minefield-state)
+		   (minefield-state-cols minefield-state))))
+    (mine-discover-helper minefield-state row col count)
     (check-win-or-loose minefield-state row col)))
 
 (define (mine-discover-helper minefield-state row col count)
