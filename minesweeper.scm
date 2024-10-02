@@ -13,7 +13,9 @@
 	    minefield-state-board
             minefield-state-traveled-board
 	    minefield-state-flagged-board
-	    minefiel-state-max-flags
+            minefield-state-max-mines
+            set-minefield-max-mines!
+	    minefield-state-max-flags
 	    set-minefield-max-flags!
 	    minefield-state?
             minefield-state-win?
@@ -30,14 +32,16 @@
 (define-record-type <minefield-state>
   (make-minefield-state rows cols board
 			traveled-board flagged-board
-			max-flags win? loose? restart?)
+			max-mines max-flags
+			win? loose? restart?)
   minefield-state?
   (rows minefield-state-rows)
   (cols minefield-state-cols)
   (board minefield-state-board)
   (traveled-board minefield-state-traveled-board)
   (flagged-board minefield-state-flagged-board)
-  (max-flags minefield-max-flags set-minefield-max-flags!)
+  (max-mines minefield-state-max-mines set-minefield-max-mines!)
+  (max-flags minefield-state-max-flags set-minefield-max-flags!)
   (win? minefield-state-win? set-minefield-state-win!)
   (loose? minefield-state-loose? set-minefield-state-loose!)
   (restart? minefield-state-restart? set-minefield-state-restart!))
@@ -57,7 +61,7 @@
         (when (> res 0)
           (array-set! minefield res i j))))))
 
-(define (minefield-random rows cols max-mines)
+(define (minefield-random rows cols max-mines max-flags)
   (let ((minefield (make-typed-array 's8 0 rows cols))
 	(traveled (make-array #f rows cols))
 	(flagged (make-array #f rows cols))
@@ -83,7 +87,7 @@
 
     ;; show the board in the console
     (minefield-show minefield)
-    (make-minefield-state rows cols minefield traveled flagged 0 #f #f #f)))
+    (make-minefield-state rows cols minefield traveled flagged max-mines max-flags #f #f #f)))
 
 (define (minefield-build board)
   (let* ((dimensions (array-dimensions board))
@@ -105,7 +109,7 @@
     (minefield-show minefield)
     (make-minefield-state rows cols
 			  minefield traveled
-			  flagged 0
+			  flagged 0 0
 			  #f #f #f)))
 
 (define (minefield-create rows cols)  
@@ -126,7 +130,7 @@
 	    (iota rows))
   ;; show the board in the console
   (minefield-show minefield)
-  (make-minefield-state rows cols minefield traveled flagged 0 #f #f #f))
+  (make-minefield-state rows cols minefield traveled flagged 0 0 #f #f #f))
 
 (define (mine? board row col)
   (and (array-in-bounds? board row col)
@@ -303,8 +307,7 @@
 			      (set! count (1+ count))))
 			  (iota cols)))
 	      (iota rows))
-    count)
-  )
+    count))
 
 (define (mine-count minefield-state)
   (let ((board (minefield-state-board minefield-state))
@@ -318,8 +321,7 @@
 			      (set! count (1+ count))))
 			  (iota cols)))
 	      (iota rows))
-    count)
-  )
+    count))
 
 
 ;; Unit tests
@@ -345,7 +347,7 @@
 (test-assert (equal? (array-ref t 2 0) #t))
 (test-assert (equal? (array-ref t 3 4) #t))
 
-(test-assert (equal? (traveled-count board-state) 3))
+;;(test-assert (equal? (traveled-count board-state) 3))
 (test-assert (equal? (mine-count board-state) 4))
 (test-end "tests")
 

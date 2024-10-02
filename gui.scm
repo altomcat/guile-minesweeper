@@ -257,7 +257,9 @@
 (define (restart game board)
   (let* ((rows (minefield-state-rows board))
 	 (cols (minefield-state-cols board))
-	 (new-board (minefield-random rows cols 10)))
+         (max-mines (minefield-state-max-mines board))
+	 (max-flags (minefield-state-max-flags board))
+	 (new-board (minefield-random rows cols max-mines max-flags)))
     (main-game game new-board)))
 
 (define (minefield-show minefield)
