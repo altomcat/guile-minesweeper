@@ -224,8 +224,7 @@
 		    (when (CheckCollisionPointRec mouse-point
 						  (vector-ref recs id))
 		      (format #t "left click on cell [~a]~%" id)
-		      (set-traveled minefield-state id)
-		      (mine-discover minefield-state id)))
+		      (set-traveled minefield-state id)))
 		  (iota total-cells))))
      ((or (IsMouseButtonPressed MOUSE_BUTTON_RIGHT)
 	  (IsKeyPressed KEY_F))
