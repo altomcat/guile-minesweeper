@@ -2,10 +2,24 @@
 	     (ice-9 format)
 	     (minesweeper))
 
-(define ROWS 10)
-(define COLS 10)
+;; easy 8x8 or 9x9 10 mines
+(define COLS 8)
+(define ROWS 8)
 (define MINES 10)
-(define FLAGS 3)
+(define FLAGS 10)
+
+;; intermediate 16x16 40 mines
+;; (define COLS 16)
+;; (define ROWS 16)
+;; (define MINES 40)
+;; (define FLAGS 40)
+
+;; expert 30x16 99 mines
+;; (define COLS 30)
+;; (define ROWS 16)
+;; (define MINES 99)
+;; (define FLAGS 99)
+
 
 (gui:init-raylib ROWS COLS)
 
