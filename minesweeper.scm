@@ -181,13 +181,17 @@
     (if (traveled? traveled row col)
         (mine-discover-around minefield-state row col)
         (array-set! traveled #t row col))
-    (check-win-or-loose minefield-state row col)
+;;    (check-win-or-loose minefield-state row col)
     (mine-discover minefield-state row col)))
+
+(define (set-traveled-all minefield-state)
+  "This procedure declares all cells as traveled."
+  (array-fill! (minefield-state-traveled-board minefield-state) #t))
 
 (define (mine-discover minefield-state row col)
   (let* ((cols (minefield-state-cols minefield-state))
-         (traveled (minefield-state-traveled-board minefield-state))
-         (count (* (minefield-state-rows minefield-state)
+	 (traveled (minefield-state-traveled-board minefield-state))
+	 (count (* (minefield-state-rows minefield-state)
                    (minefield-state-cols minefield-state))))
     (mine-discover-helper minefield-state row col count)
     (check-win-or-loose minefield-state row col)))
@@ -199,10 +203,9 @@
         (traveled (minefield-state-traveled-board minefield-state))
         (flagged (minefield-state-flagged-board minefield-state)))
     (when  (and (blank? board row col)
-                (>= count 0))           ; the counter is for debugging
+                (>= count 0))
       (array-set! traveled #t row col)
       (unset-flagged minefield-state row col)
-      
       (for-each (lambda (v)
                   (let ((ri (+ row (car v)))
                         (rj (+ col (cadr v))))
@@ -245,7 +248,6 @@
                     (unset-flagged minefield-state ri rj)
                     (mine-discover-helper minefield-state ri rj (1- count)))
                    ((mine? board ri rj)
-                    (display "YOU LOOSE!\n")
                     (array-set! traveled #t ri rj)
                     (unset-flagged minefield-state ri rj)
                     (set-minefield-state-loose! minefield-state #t))
@@ -268,6 +270,7 @@
       (set-minefield-state-loose! minefield-state #t))
      ((win-game? minefield-state)
       (display "YOU WIN!\n")
+      (set-traveled-all minefield-state)
       (set-minefield-state-win! minefield-state #t)))))
 
 (define (toggle-flagged minefield-state id)
