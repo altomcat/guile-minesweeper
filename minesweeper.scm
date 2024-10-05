@@ -20,6 +20,7 @@
             minefield-state-win?
             minefield-state-loose?
             minefield-state-restart?
+	    set-minefield-state-restart!
             set-traveled
             unset-flagged
             toggle-flagged

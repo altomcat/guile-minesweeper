@@ -27,7 +27,7 @@
 (define MAX-SPRITES 12)
 
 (define EMPTY-CELL 0)
-(define FLAG-CELL 9)
+(define FLAGGED-CELL 9)
 (define HIDDEN-CELL 10)
 (define MINE-CELL 11)
 
@@ -57,7 +57,7 @@
   (assets minesweeper-game-assets)
   (sprite-recs minesweeper-game-sprite-recs)
   (clock minesweeper-game-clock)
-  (state minesweeper-game-state minesweeper-game-state-set!))
+  (state minesweeper-game-state set-minesweeper-game-state!))
 
 (define (init-raylib rows cols)
   (let ((w (get-screen-width cols))
@@ -120,7 +120,7 @@
     (unless exitWindow
       (manage-key-event minesweeper-game minefield-state)
       
-      ;; lucky me for the first click!
+      ;; lucky me for the first click or restart from shortkey !
       (when (minefield-state-restart? minefield-state)
         (let ((res (restart minesweeper-game minefield-state)))
           (loop #t)))
@@ -138,14 +138,14 @@
           (DrawText "YOU WIN!!!" START-X 10 20 GREEN)
           (when (not (equal? (minesweeper-game-state minesweeper-game)
                              'stop))
-            (minesweeper-game-state-set! minesweeper-game 'stop)
+            (set-minesweeper-game-state! minesweeper-game 'stop)
             (freeze-elapsed-time minesweeper-game)
             (PlaySound congrats-snd))))
        ((minefield-state-loose? minefield-state)
         (DrawText "YOU LOOSE!!!" START-X 10 20 RED)
         (when (not (equal? (minesweeper-game-state minesweeper-game)
                            'stop))
-          (minesweeper-game-state-set! minesweeper-game 'stop)
+          (set-minesweeper-game-state! minesweeper-game 'stop)
           (freeze-elapsed-time minesweeper-game)))
        ((not (or (minefield-state-win? minefield-state)
                  (minefield-state-loose? minefield-state)))
@@ -175,7 +175,7 @@
   (format #t "This is the end...~%")
   (let ((res (minesweeper-game-state minesweeper-game)))
     (format #t "Return ~a\n" res)
-    (minesweeper-game-state-set! minesweeper-game 'running)
+    (set-minesweeper-game-state! minesweeper-game 'running)
     (freeze-elapsed-time minesweeper-game)
     res))
 
@@ -194,7 +194,7 @@
                             (let* ((state (array-ref board-state i j))
                                    (id
                                     (cond
-                                     ((flagged? flagged i j) FLAG-CELL)
+                                     ((flagged? flagged i j) FLAGGED-CELL)
                                      ((not (traveled? traveled i j)) HIDDEN-CELL)
                                      ((= state -1) MINE-CELL)
                                      (else state))))
@@ -216,35 +216,37 @@
         (game-over? (or (minefield-state-loose? minefield-state)
                         (minefield-state-win? minefield-state))))
     (cond
-     (game-over?)
+     (game-over?
+      (when (IsKeyPressed KEY_R)
+	(set-minesweeper-game-state! minesweeper-game 'restart)
+	(set-minefield-state-restart! minefield-state #t)))
      ((IsMouseButtonPressed MOUSE_BUTTON_LEFT)
       (let loop ((mouse-point (GetMousePosition)))
-        (for-each (lambda (id)
-                    (when (CheckCollisionPointRec mouse-point
-                                                  (vector-ref recs id))
-                      (format #t "left click on cell [~a]~%" id)
-                      (set-traveled minefield-state id)))
-                  (iota total-cells))))
+	(for-each (lambda (id)
+		    (when (CheckCollisionPointRec mouse-point
+						  (vector-ref recs id))
+		      (format #t "left click on cell [~a]~%" id)
+		      (set-traveled minefield-state id)))
+		  (iota total-cells))))
      ((or (IsMouseButtonPressed MOUSE_BUTTON_RIGHT)
-          (IsKeyPressed KEY_F))
+	  (IsKeyPressed KEY_F))
       (let ((mouse-point (GetMousePosition)))
-        (for-each (lambda (id)
-                    (when (CheckCollisionPointRec mouse-point
-                                                  (vector-ref recs id))
-                      (format #t "right click oncell [~a]~%" id)
-                      (toggle-flagged minefield-state id)))
-                  (iota total-cells))))
+	(for-each (lambda (id)
+		    (when (CheckCollisionPointRec mouse-point
+						  (vector-ref recs id))
+		      (format #t "right click oncell [~a]~%" id)
+		      (toggle-flagged minefield-state id)))
+		  (iota total-cells))))
      ((IsKeyPressed KEY_P)
       (if (equal? (minesweeper-game-state minesweeper-game) 'running)
-          (begin
-            (freeze-elapsed-time minesweeper-game) ; run => pause
-            (minesweeper-game-state-set! minesweeper-game 'pause))
-          (begin
-            (set-clock-ref minesweeper-game) ; pause => run
-            (minesweeper-game-state-set! minesweeper-game 'running))))
+	  (begin
+	    (freeze-elapsed-time minesweeper-game) ; run => pause
+	    (set-minesweeper-game-state! minesweeper-game 'pause))
+	  (begin
+	    (set-clock-ref minesweeper-game) ; pause => run
+	    (set-minesweeper-game-state! minesweeper-game 'running))))
      ((IsKeyPressed KEY_R)
-      ;;(freeze-elapsed-time minesweeper-game)
-      (minesweeper-game-state-set! minesweeper-game 'restart)))))
+      (set-minesweeper-game-state! minesweeper-game 'restart)))))
 
 (define (end-game minesweeper-game)
   (let ((assets (minesweeper-game-assets minesweeper-game)))
@@ -257,8 +259,11 @@
   (let* ((rows (minefield-state-rows board))
          (cols (minefield-state-cols board))
          (max-mines (minefield-state-max-mines board))
-         (max-flags (minefield-state-max-flags board))
+         (max-flags (+ (minefield-state-max-flags board)
+		       (traveled-count board)))
+	 (t (make-clock 0 0))
          (new-board (minefield-random rows cols max-mines max-flags)))
+    (reset-clock game)
     (main-game game new-board)))
 
 (define (minefield-show minefield)
@@ -291,6 +296,12 @@
   "Set reference clock to current time."
   (let ((clock (minesweeper-game-clock game)))
     (clock-ref-time-set! clock (GetTime))))
+
+(define (reset-clock game)
+  "Reset clock."
+  (let ((clock (minesweeper-game-clock game)))
+    (clock-elapsed-time-set! clock 0)
+    (clock-ref-time-set! clock 0)))
 
 (define (freeze-elapsed-time game)
   "Update elapsed time based on reference clock."
