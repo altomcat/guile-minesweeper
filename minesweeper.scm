@@ -27,7 +27,8 @@
             mine-discover
             flagged?
             traveled?
-            traveled-count))
+            traveled-count
+	    flagged-count))
 
 (define-record-type <minefield-state>
   (make-minefield-state rows cols board
@@ -315,7 +316,6 @@
         (rows (minefield-state-rows minefield-state))
         (cols (minefield-state-cols minefield-state))
         (count 0))
-    
     (for-each (lambda (i)
                 (for-each (lambda (j)
                             (when (equal? (array-ref board i j) #t)
@@ -329,7 +329,6 @@
         (rows (minefield-state-rows minefield-state))
         (cols (minefield-state-cols minefield-state))
         (count 0))
-    
     (for-each (lambda (i)
                 (for-each (lambda (j)
                             (when (equal? (array-ref board i j) -1)
@@ -338,6 +337,18 @@
               (iota rows))
     count))
 
+(define (flagged-count minefield-state)
+  (let ((flagged (minefield-state-flagged-board  minefield-state))
+        (rows (minefield-state-rows minefield-state))
+        (cols (minefield-state-cols minefield-state))
+        (count 0))
+    (for-each (lambda (i)
+                (for-each (lambda (j)
+                            (when (equal? (array-ref flagged i j) #t)
+                              (set! count (1+ count))))
+                          (iota cols)))
+              (iota rows))
+    count))
 ;;
 ;;
 (test-begin "tests")

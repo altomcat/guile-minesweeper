@@ -260,7 +260,7 @@
          (cols (minefield-state-cols board))
          (max-mines (minefield-state-max-mines board))
          (max-flags (+ (minefield-state-max-flags board)
-		       (traveled-count board)))
+		       (flagged-count board)))
 	 (t (make-clock 0 0))
          (new-board (minefield-random rows cols max-mines max-flags)))
     (reset-clock game)
